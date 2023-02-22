@@ -9,6 +9,8 @@
 #include "Countimer.h"
 #include <Wire.h>;
 #include <LiquidCrystal_I2C.h>;
+#include "NTPClient.h"
+#include "WiFiUdp.h"
 
 // #define D0 16
 // #define D1 5
@@ -22,6 +24,17 @@
 
 // Welcome text (scrolling)
 String welcomeMessage = "Benvenuto in B-Grow!";
+
+//time (NTP)
+const long utcOffsetInSeconds = 3600;  //UTC +1 - Rome
+char daysOfTheWeek[7][12] = { "Domenica", "Lunedi", "Martedi", "Mercoledi", "Giovedi", "Venerdi", "Sabato" };
+
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+
+// count none for update NTP time
+Countimer ntpClientUpdateTimer;
 
 // Used to identify first loop
 bool firstLoop = true;
@@ -74,7 +87,8 @@ float readHumidity = 0.0;
 bool readHumidityNotValid = true;
 
 // Start up LCD as 20 characters X 4 lines
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+int lcdChars = 20;
+LiquidCrystal_I2C lcd(0x27, lcdChars, 4);
 
 byte checkLcdChar[] = {
   B00000,
@@ -196,23 +210,57 @@ setInterval(function ( ) {
 </script>
 </html>)rawliteral";
 
-void scrollTextLcd(int row, String message, int delayTime, int lcdColumns) {
-  for (int i = 0; i < lcdColumns; i++) {
+void scrollTextLcd(int row, String message, int delayTime) {
+  for (int i = 0; i < lcdChars; i++) {
     message = " " + message;
   }
   message = message + " ";
   for (int pos = 0; pos < message.length(); pos++) {
     lcd.setCursor(0, row);
-    lcd.print(message.substring(pos, pos + lcdColumns));
+    lcd.print(message.substring(pos, pos + lcdChars));
     delay(delayTime);
   }
 }
 
+void alignRightLcd(int row, String message) {
+  int startPosition = lcdChars - message.length();
+  if (startPosition < 0) {
+    startPosition = 0;
+  }
+  for (int pos = 0; pos < startPosition; pos++) {
+    message = " " + message;
+  }
+  lcd.setCursor(0, row);
+  lcd.print(message);
+}
+
+void alignCenterLcd(int row, String message) {
+  int startPosition = (lcdChars - message.length()) / 2;
+  if (startPosition < 0) {
+    startPosition = 0;
+  }
+  for (int pos = 0; pos < startPosition; pos++) {
+    message = " " + message;
+  }
+  int rightSpaces = lcdChars - message.length();
+   if (rightSpaces < 0) {
+    rightSpaces = 0;
+  }
+  for (int pos = 0; pos < rightSpaces; pos++) {
+    message = message + " ";
+  } 
+
+  lcd.setCursor(0, row);
+  lcd.print(message);
+}
+
 void writeTempNHumiLcd() {
-  lcd.setCursor(0, 1);  // Pos 1 line 2
-  lcd.print("                    ");
-  lcd.setCursor(0, 1);  // Pos 1 line 2
-  lcd.print("t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%");
+  // lcd.setCursor(0, 1);  // Pos 1 line 2
+  // lcd.print("                    ");
+  // lcd.setCursor(0, 1);  // Pos 1 line 2
+  // lcd.print("t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%");
+  String text = "t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%";
+  alignCenterLcd(1,text);
 }
 
 String getRele1StatusString() {
@@ -224,8 +272,6 @@ String getRele1StatusString() {
 
 void printRelaysStatusLcd() {
   lcd.setCursor(0, 2);
-  lcd.print("                    ");
-  lcd.setCursor(0, 2);
   lcd.print(" 1");
   if (rele1ActiveStatus == true) {
     lcd.write(1);
@@ -233,13 +279,13 @@ void printRelaysStatusLcd() {
     lcd.write(0);
   }
   lcd.setCursor(4, 2);
-  lcd.print(" | 2");
+  lcd.print("| 2");
   lcd.write(0);
-  lcd.setCursor(8, 2);
-  lcd.print(" | 3");
+  lcd.setCursor(9, 2);
+  lcd.print("| 3");
   lcd.write(0);
-  lcd.setCursor(12, 2);
-  lcd.print(" | 4");
+  lcd.setCursor(14, 2);
+  lcd.print("| 4");
   lcd.write(0);
 }
 
@@ -289,6 +335,18 @@ void turnOnHeating() {
   }
 }
 
+void updateTime() {
+  timeClient.update();
+  // Serial.print(daysOfTheWeek[timeClient.getDay()]);
+  // Serial.print(", ");
+  // Serial.print(timeClient.getHours());
+  // Serial.print(":");
+  // Serial.print(timeClient.getMinutes());
+  // Serial.print(":");
+  // Serial.println(timeClient.getSeconds());
+  // Serial.println(timeClient.getFormattedTime());
+  alignRightLcd(3, timeClient.getFormattedTime());
+}
 // Handle Rele 1 activation by temerature status (on if under the rage otherwise off)
 void checkTemperature() {
   if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
@@ -375,28 +433,34 @@ void setup() {
   lcd.createChar(0, lockLcdChar);
   lcd.createChar(1, checkLcdChar);
   lcd.backlight();
+
   // Welcome Message
-  scrollTextLcd(1, welcomeMessage, 330, 20);
+  scrollTextLcd(1, welcomeMessage, 300);
+
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   Serial.print("Connessione a Wifi in corso");
   lcd.clear();
   lcd.print("Connessione Wifi");
-  // lcd.blink();
+  lcd.blink();
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
-    lcd.print(".");
+    // lcd.print(".");
   }
   Serial.println(".");
+  lcd.noBlink();
 
   // Print IP Address To Serial port
   Serial.print("Connessione Wifi riuscita! IP: ");
   Serial.println(WiFi.localIP());
   // Print ip address to LCD
   lcd.clear();
-  lcd.print("IP: ");
-  lcd.print(WiFi.localIP());
+  String ip = "IP:" + WiFi.localIP().toString();
+  alignCenterLcd(0,ip);
+
+  // Start NTP client
+  timeClient.begin();
 
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -417,15 +481,18 @@ void setup() {
   // Start server
   server.begin();
 
-  // Set the "Rele 1 active count down" (it will leave on Rele 1 for '30' seconds)
+  // Set the "Rele 1 active count down" (it will leave on Rele 1 for 'tot' seconds)
   rele1OnTimer.setCounter(0, 0, heatingActiveForSeconds, rele1OnTimer.COUNT_DOWN, turnOffHeating);
   // Set the callback function to call every second while "Rele 1 active count down" is active
   rele1OnTimer.setInterval(refreshRele1OnClock, 1000);
 
-  // Set the "Rele 1 inactive count down" (it will leave of Rele 1 at least for '60' seconds)
+  // Set the "Rele 1 inactive count down" (it will leave of Rele 1 at least for 'tot' seconds)
   rele1OffTimer.setCounter(0, 0, heatingIdleForSeconds, rele1OffTimer.COUNT_DOWN, onRele1OffComplete);
   // Set the callback function to call every second while "Rele 1 inactive count down" is active
   rele1OffTimer.setInterval(refreshRele1OffClock, 1000);
+
+  // Execute the update of NTP client time every 1 second
+  ntpClientUpdateTimer.setInterval(updateTime, 1000);
 
   // Execute the read of dht 22 every 2 seconds
   dhtReadTimer.setInterval(readDHT22, 2000);
@@ -436,6 +503,9 @@ void loop() {
   rele1OnTimer.run();
   rele1OffTimer.run();
 
+  // Execute the none count (refreshing interval) for NTP time update
+  ntpClientUpdateTimer.run();
+
   // Execute the none count (refreshing interval) counter for read dht22 every tot seconds
   dhtReadTimer.run();
 
@@ -445,6 +515,7 @@ void loop() {
     // int the first loop this count down is used to mantain an idle period waiting sensor ar more stable
     rele1OffTimer.start();
     dhtReadTimer.start();
+    ntpClientUpdateTimer.start();
     firstLoop == false;
   }
 }
