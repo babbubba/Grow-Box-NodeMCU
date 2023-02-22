@@ -7,6 +7,21 @@
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include "Countimer.h"
+#include <Wire.h>;
+#include <LiquidCrystal_I2C.h>;
+
+// #define D0 16
+// #define D1 5
+// #define D2 4
+// #define D3 0
+// #define D4 2
+// #define D5 14
+// #define D6 12
+// #define D7 13
+// #define D8 15
+
+// Welcome text (scrolling)
+String welcomeMessage = "Benvenuto in B-Grow!";
 
 // Used to identify first loop
 bool firstLoop = true;
@@ -18,8 +33,12 @@ bool firstTimeRele1OffExecuted = true;
 const char *ssid = "bHome.Wifi";
 const char *password = "0EvItyr6mSIFP1FpIDMuwWqb";
 
+// IC2 Pins
+#define SCL 5  // D1
+#define SDA 4  // D2
+
 // DHT Pin
-#define DHTPIN 5  // Digital pin connected to the DHT sensor (D1)
+#define DHTPIN 0  // Digital pin connected to the DHT sensor (D3)
 
 // RELAYS PINS
 #define RELE1 16  // D0 (Heating)
@@ -28,18 +47,18 @@ const char *password = "0EvItyr6mSIFP1FpIDMuwWqb";
 #define RELE4 13  // D7
 
 // Setting Temerature Range
-const float temperatureMin = 23;
+const float temperatureMin = 21;
 const float temperatureMax = 24;
-const float temperatureTol = 0.4;
+const float temperatureTol = 0.5;
 
 // Output value for Rele 1 (Heating)
-char rele1On[] = { "N/D" };
+bool rele1ActiveStatus = false;
 
 // Temperature relay counter
 Countimer rele1OnTimer;
 Countimer rele1OffTimer;
-const int heatingActiveForSeconds = 30;
-const int heatingIdleForSeconds = 60;
+const int heatingActiveForSeconds = 20;
+const int heatingIdleForSeconds = 100;
 
 // Se variable to permit or not to turn on rele1 (HEATING)
 bool rele1CanTurnOn = false;
@@ -54,6 +73,30 @@ bool readTemperatureNotValid = true;
 float readHumidity = 0.0;
 bool readHumidityNotValid = true;
 
+// Start up LCD as 20 characters X 4 lines
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+byte checkLcdChar[] = {
+  B00000,
+  B00001,
+  B00011,
+  B10110,
+  B11100,
+  B01000,
+  B00000,
+  B00000
+};
+
+byte lockLcdChar[] = {
+  B01110,
+  B10001,
+  B10001,
+  B11111,
+  B11011,
+  B11011,
+  B11111,
+  B00000
+};
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -153,6 +196,53 @@ setInterval(function ( ) {
 </script>
 </html>)rawliteral";
 
+void scrollTextLcd(int row, String message, int delayTime, int lcdColumns) {
+  for (int i = 0; i < lcdColumns; i++) {
+    message = " " + message;
+  }
+  message = message + " ";
+  for (int pos = 0; pos < message.length(); pos++) {
+    lcd.setCursor(0, row);
+    lcd.print(message.substring(pos, pos + lcdColumns));
+    delay(delayTime);
+  }
+}
+
+void writeTempNHumiLcd() {
+  lcd.setCursor(0, 1);  // Pos 1 line 2
+  lcd.print("                    ");
+  lcd.setCursor(0, 1);  // Pos 1 line 2
+  lcd.print("t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%");
+}
+
+String getRele1StatusString() {
+  if (rele1ActiveStatus == true) {
+    return "Acceso";
+  }
+  return "Spento";
+}
+
+void printRelaysStatusLcd() {
+  lcd.setCursor(0, 2);
+  lcd.print("                    ");
+  lcd.setCursor(0, 2);
+  lcd.print(" 1");
+  if (rele1ActiveStatus == true) {
+    lcd.write(1);
+  } else {
+    lcd.write(0);
+  }
+  lcd.setCursor(4, 2);
+  lcd.print(" | 2");
+  lcd.write(0);
+  lcd.setCursor(8, 2);
+  lcd.print(" | 3");
+  lcd.write(0);
+  lcd.setCursor(12, 2);
+  lcd.print(" | 4");
+  lcd.write(0);
+}
+
 // Replaces placeholder in HTML with values (is called only first time in the setup method)
 String processor(const String &var) {
   //Serial.println(var);
@@ -161,7 +251,7 @@ String processor(const String &var) {
   } else if (var == "HUMIDITY") {
     return String(readHumidity);
   } else if (var == "RELE1") {
-    return String(rele1On);
+    return getRele1StatusString();
   } else if (var == "temperatureMin") {
     return String(temperatureMin);
   } else if (var == "temperatureMax") {
@@ -174,43 +264,47 @@ String processor(const String &var) {
     return String(heatingIdleForSeconds);
   }
 
-
-  //temperatureTol
   return String();
+}
+
+// Called when the count of Rele1 in active status is completed (it must to be turned off now) or when temperature is too high
+void turnOffHeating() {
+  if (rele1ActiveStatus == true) {
+    rele1OnTimer.stop();
+    rele1ActiveStatus = false;
+    digitalWrite(RELE1, HIGH);
+    Serial.println("Riscaldamento spento (o tempo accensione scaduto)");
+    rele1CanTurnOn = false;
+    rele1OffTimer.start();
+  }
+}
+
+// Called when need to turn on heating
+void turnOnHeating() {
+  if (rele1ActiveStatus == false) {
+    rele1OnTimer.start();
+    Serial.println("Riscaldamento attivato");
+    rele1ActiveStatus = true;
+    digitalWrite(RELE1, LOW);
+  }
 }
 
 // Handle Rele 1 activation by temerature status (on if under the rage otherwise off)
 void checkTemperature() {
   if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
-    // Temperature is in the rage turn of the rele 1
-    rele1OnTimer.stop();
-    strcpy(rele1On, "OFF");
-    digitalWrite(RELE1, HIGH);
-    rele1CanTurnOn = true;
+    // Temperature is in the range turn of the rele 1
+    turnOffHeating();
   } else if ((readTemperature - temperatureTol) < temperatureMin) {
     //temeperature too low... turn on rele 1 if possible and if is not already active
     if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
-      rele1OnTimer.start();
-      Serial.println("Riscaldamento attivato");
-      strcpy(rele1On, "ON");
-      digitalWrite(RELE1, LOW);
+      turnOnHeating();
     }
   } else {
     // Temperature is too high... turn off rele 1
-    rele1OnTimer.stop();
-    strcpy(rele1On, "OFF");
-    digitalWrite(RELE1, HIGH);
-    rele1CanTurnOn = true;
+    turnOffHeating();
   }
-}
-
-// Called when the count of Rele1 in active status is completed (it must to be turned off now)
-void onRele1OnComplete() {
-  strcpy(rele1On, "OFF");
-  digitalWrite(RELE1, HIGH);
-  Serial.println("Tempo di accensione del riscaldamento scaduto");
-  rele1CanTurnOn = false;
-  rele1OffTimer.start();
+  // Print relays statuses on LCD
+  printRelaysStatusLcd();
 }
 
 // Called when the count of Rele1 in unactive status is completed (it can be turned on now)
@@ -252,7 +346,7 @@ void readDHT22() {
     readHumidity = justReadHumidity;
     readHumidityNotValid = false;
   }
-
+  writeTempNHumiLcd();
   // after reading sensor elaborate relay 1 status
   checkTemperature();
 }
@@ -275,18 +369,34 @@ void setup() {
   pinMode(RELE4, OUTPUT);
   digitalWrite(RELE4, HIGH);
 
+  //Init LCD
+  Wire.begin(SDA, SCL);
+  lcd.begin();
+  lcd.createChar(0, lockLcdChar);
+  lcd.createChar(1, checkLcdChar);
+  lcd.backlight();
+  // Welcome Message
+  scrollTextLcd(1, welcomeMessage, 330, 20);
   // Connect to Wi-Fi
   WiFi.begin(ssid, password);
   Serial.print("Connessione a Wifi in corso");
+  lcd.clear();
+  lcd.print("Connessione Wifi");
+  // lcd.blink();
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.print(".");
+    lcd.print(".");
   }
   Serial.println(".");
 
   // Print IP Address To Serial port
   Serial.print("Connessione Wifi riuscita! IP: ");
   Serial.println(WiFi.localIP());
+  // Print ip address to LCD
+  lcd.clear();
+  lcd.print("IP: ");
+  lcd.print(WiFi.localIP());
 
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -301,14 +411,14 @@ void setup() {
     request->send_P(200, "text/plain", String(readHumidity).c_str());
   });
   server.on("/rele1", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send_P(200, "text/plain", String(rele1On).c_str());
+    request->send_P(200, "text/plain", getRele1StatusString().c_str());
   });
 
   // Start server
   server.begin();
 
   // Set the "Rele 1 active count down" (it will leave on Rele 1 for '30' seconds)
-  rele1OnTimer.setCounter(0, 0, heatingActiveForSeconds, rele1OnTimer.COUNT_DOWN, onRele1OnComplete);
+  rele1OnTimer.setCounter(0, 0, heatingActiveForSeconds, rele1OnTimer.COUNT_DOWN, turnOffHeating);
   // Set the callback function to call every second while "Rele 1 active count down" is active
   rele1OnTimer.setInterval(refreshRele1OnClock, 1000);
 
@@ -332,6 +442,7 @@ void loop() {
   // Only if it is the first loop after power on NodeMcu starts the "Rele 1 inactive count down" (so heating can start untill this periond when u just poer on this module)
   // and the read DHT22 interval
   if (firstLoop == true) {
+    // int the first loop this count down is used to mantain an idle period waiting sensor ar more stable
     rele1OffTimer.start();
     dhtReadTimer.start();
     firstLoop == false;
