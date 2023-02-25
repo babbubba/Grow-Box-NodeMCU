@@ -13,24 +13,9 @@
 #include "WiFiUdp.h"
 
 #include "index_html.h";
-#include "lcd_chars.h"
 
-// #define D0 16
-// #define D1 5
-// #define D2 4
-// #define D3 0
-// #define D4 2
-// #define D5 14
-// #define D6 12
-// #define D7 13
-// #define D8 15
-
-// Welcome text (scrolling)
-String welcomeMessage = "Benvenuto in B-Grow!";
-
-//time (NTP)
-const long utcOffsetInSeconds = 3600;  //UTC +1 - Rome
-char daysOfTheWeek[7][12] = { "Domenica", "Lunedi", "Martedi", "Mercoledi", "Giovedi", "Venerdi", "Sabato" };
+#include "persist_data.h";
+#include "user_data.h";
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -45,27 +30,12 @@ bool firstLoop = true;
 // Used to identify the first time the Rcounter of the Rele1 in unactive status is completed
 bool firstTimeRele1OffExecuted = true;
 
-// Wireless credential
-const char *ssid = "bHome.Wifi";
-const char *password = "0EvItyr6mSIFP1FpIDMuwWqb";
+// Set LCD columns
+int lcdChars = 20;
 
-// IC2 Pins
-#define SCL 5  // D1
-#define SDA 4  // D2
 
-// DHT Pin
-#define DHTPIN 0  // Digital pin connected to the DHT sensor (D3)
 
-// RELAYS PINS
-#define RELE1 16  // D0 (Heating)
-#define RELE2 14  // D5
-#define RELE3 12  // D6
-#define RELE4 13  // D7
 
-// Setting Temerature Range
-const float temperatureMin = 21;
-const float temperatureMax = 24;
-const float temperatureTol = 0.5;
 
 // Output value for Rele 1 (Heating)
 bool rele1ActiveStatus = false;
@@ -85,8 +55,6 @@ Countimer scheduledLightTimer;
 // Temperature relay counter
 Countimer rele1OnTimer;
 Countimer rele1OffTimer;
-const int heatingActiveForSeconds = 20;
-const int heatingIdleForSeconds = 100;
 
 // Se variable to permit or not to turn on rele1 (HEATING)
 bool rele1CanTurnOn = false;
@@ -95,14 +63,7 @@ bool rele1CanTurnOn = false;
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
-// define variable to handle temperature & humidity
-float readTemperature = 0.0;
-bool readTemperatureNotValid = true;
-float readHumidity = 0.0;
-bool readHumidityNotValid = true;
-
-// Start up LCD as 20 characters X 4 lines
-int lcdChars = 20;
+// Start up LCD 
 LiquidCrystal_I2C lcd(0x27, lcdChars, 4);
 
 // Create AsyncWebServer object on port 80
@@ -111,11 +72,10 @@ AsyncWebServer server(80);
 // DHT22 read count
 Countimer dhtReadTimer;
 
-unsigned long previousMillis = 0;  // will store last time DHT was updated
-// Set the updates interval of DHT readings
-const long interval = 10000;
 
-// the HTML page
+
+
+
 
 
 void scrollTextLcd(int row, String message, int delayTime) {
@@ -161,6 +121,7 @@ void alignCenterLcd(int row, String message) {
   lcd.setCursor(0, row);
   lcd.print(message);
 }
+
 
 void writeTempNHumiLcd() {
   String text = "t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%";
