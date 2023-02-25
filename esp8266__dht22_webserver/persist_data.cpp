@@ -3,7 +3,6 @@
 #include <EEPROM.h>
 
 // define the number of bytes you want to access
-#define EEPROM_SIZE 16
 
 void writeIntToEEPROM(int address, int number)
 { 
@@ -19,3 +18,51 @@ int readIntFromEEPROM(int address)
   byte byte2 = EEPROM.read(address + 1);
   return (byte1 << 8) + byte2;
 }
+
+void writeBoolToEEPROM(int address, bool value) {
+  byte byte1 = value;
+  EEPROM.write(address, byte1);
+}
+
+bool readBoolFromEEPROM(int address) {
+  byte byte1 = EEPROM.read(address);
+  return byte1;
+}
+
+bool read_lightManual() {
+  return readBoolFromEEPROM(1);
+}
+
+void write_lightManual(bool value) {
+  writeBoolToEEPROM(1, value);
+}
+
+//lightManualOnTime
+void write_lightManualOnTime(int hour, int minute) {
+  writeIntToEEPROM(2, hour);
+  writeIntToEEPROM(4, minute);
+}
+
+int read_lightManualOnTimeHour() {
+  return readIntFromEEPROM(2);
+}
+
+int read_lightManualOnTimeMinute() {
+  return readIntFromEEPROM(4);
+}
+
+//lightManualOffTime
+void write_lightManualOffTime(int hour, int minute) {
+  writeIntToEEPROM(6, hour);
+  writeIntToEEPROM(8, minute);
+}
+
+int read_lightManualOffTimeHour() {
+  return readIntFromEEPROM(6);
+}
+
+int read_lightManualOffTimeMinute() {
+  return readIntFromEEPROM(8);
+}
+
+

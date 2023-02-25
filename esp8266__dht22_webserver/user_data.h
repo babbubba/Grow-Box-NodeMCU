@@ -1,3 +1,6 @@
+#ifndef USER_DATA_H
+#define USER_DATA_H
+
 // Wireless credential
 const char *ssid = "bHome.Wifi";
 const char *password = "0EvItyr6mSIFP1FpIDMuwWqb";
@@ -50,6 +53,14 @@ bool readTemperatureNotValid = true;
 float readHumidity = 0.0;
 bool readHumidityNotValid = true;
 
+
+// Lighting setting
+int lightHStart = 0;
+int lightMStart = 0;
+int lightHStop = 0;
+int lightMStop = 0;
+bool lightManual = false;
+
 byte checkLcdChar[] = {
   B00000,
   B00001,
@@ -72,3 +83,4 @@ byte lockLcdChar[] = {
   B00000
 };
 
+#endif

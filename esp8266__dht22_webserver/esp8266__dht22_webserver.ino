@@ -11,6 +11,7 @@
 #include <LiquidCrystal_I2C.h>;
 #include "NTPClient.h"
 #include "WiFiUdp.h"
+#include <EEPROM.h>
 
 #include "index_html.h";
 
@@ -33,22 +34,12 @@ bool firstTimeRele1OffExecuted = true;
 // Set LCD columns
 int lcdChars = 20;
 
-
-
-
-
 // Output value for Rele 1 (Heating)
 bool rele1ActiveStatus = false;
 
 // Output value for Rele 2 (Light)
 bool rele2ActiveStatus = false;
 
-// Lighting setting
-int lightHStart = 19;
-int lightMStart = 38;
-int lightHStop = 19;
-int lightMStop = 40;
-bool lightManual = false;
 
 Countimer scheduledLightTimer;
 
@@ -63,7 +54,7 @@ bool rele1CanTurnOn = false;
 #define DHTTYPE DHT22
 DHT dht(DHTPIN, DHTTYPE);
 
-// Start up LCD 
+// Start up LCD
 LiquidCrystal_I2C lcd(0x27, lcdChars, 4);
 
 // Create AsyncWebServer object on port 80
@@ -71,12 +62,6 @@ AsyncWebServer server(80);
 
 // DHT22 read count
 Countimer dhtReadTimer;
-
-
-
-
-
-
 
 void scrollTextLcd(int row, String message, int delayTime) {
   for (int i = 0; i < lcdChars; i++) {
@@ -111,12 +96,12 @@ void alignCenterLcd(int row, String message) {
     message = " " + message;
   }
   int rightSpaces = lcdChars - message.length();
-   if (rightSpaces < 0) {
+  if (rightSpaces < 0) {
     rightSpaces = 0;
   }
   for (int pos = 0; pos < rightSpaces; pos++) {
     message = message + " ";
-  } 
+  }
 
   lcd.setCursor(0, row);
   lcd.print(message);
@@ -125,7 +110,7 @@ void alignCenterLcd(int row, String message) {
 
 void writeTempNHumiLcd() {
   String text = "t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%";
-  alignCenterLcd(1,text);
+  alignCenterLcd(1, text);
 }
 
 String getRele1StatusString() {
@@ -140,6 +125,14 @@ String getRele2StatusString() {
     return "Acceso";
   }
   return "Spento";
+}
+
+String getLightManualString() {
+  if (lightManual == true) {
+    return "1";
+  } else {
+    return "0";
+  }
 }
 
 void printRelaysStatusLcd() {
@@ -165,6 +158,19 @@ void printRelaysStatusLcd() {
   lcd.write(0);
 }
 
+String getTimeFormatedFromIntegers(int hour, int minute) {
+  String hourStr = String(hour);
+  if (hourStr.length() == 1) {
+    hourStr = "0" + hourStr;
+  }
+  String minuteStr = String(minute);
+  if (minuteStr.length() == 1) {
+    minuteStr = "0" + minuteStr;
+  }
+
+  return hourStr + ":" + minuteStr;
+}
+
 // Replaces placeholder in HTML with values (is called only first time in the setup method)
 String processor(const String &var) {
   //Serial.println(var);
@@ -175,7 +181,7 @@ String processor(const String &var) {
   } else if (var == "RELE1") {
     return getRele1StatusString();
   } else if (var == "RELE2") {
-    return getRele1StatusString();
+    return getRele2StatusString();
   } else if (var == "temperatureMin") {
     return String(temperatureMin);
   } else if (var == "temperatureMax") {
@@ -186,6 +192,12 @@ String processor(const String &var) {
     return String(heatingActiveForSeconds);
   } else if (var == "heatingIdleForSeconds") {
     return String(heatingIdleForSeconds);
+  } else if (var == "lightManual") {
+    return getLightManualString();
+  } else if (var == "lightManualOnTime") {
+    return getTimeFormatedFromIntegers(lightHStart, lightMStart);
+  } else if (var == "lightManualOffTime") {
+    return getTimeFormatedFromIntegers(lightHStop, lightMStop);
   }
 
   return String();
@@ -236,7 +248,7 @@ void turnOffLight_manual() {
 }
 
 int getMinutesFromMidNight(int hour, int minute) {
-  return  (hour * 60) + minute;
+  return (hour * 60) + minute;
 }
 
 void checkLightTimer() {
@@ -250,8 +262,7 @@ void checkLightTimer() {
 
   if (currentMinutes >= lightStartMinutes && currentMinutes < lightStopMinutes) {
     turnOnLight_auto();
-  }
-  else {
+  } else {
     turnOffLight_auto();
   }
 }
@@ -309,11 +320,11 @@ void refreshRele1OnClock() {
 }
 
 // Called every second to show Rele1 in unactive status on serial monitor (only first time)
-void refreshRele1OffClock() {
-  if (firstTimeRele1OffExecuted == false) return;
-  Serial.print("Tempo di attesa del riscaldamento rimasto: ");
-  Serial.println(rele1OffTimer.getCurrentTime());
-}
+// void refreshRele1OffClock() {
+//   if (firstTimeRele1OffExecuted == false) return;
+//   Serial.print("Tempo di attesa del riscaldamento rimasto: ");
+//   Serial.println(rele1OffTimer.getCurrentTime());
+// }
 
 // Read the sensor temperature and humidity
 void readDHT22() {
@@ -340,10 +351,101 @@ void readDHT22() {
   checkTemperature();
 }
 
+void loadPersistentData() {
+  Serial.println("Recupero dati persistenti...");
+  lightManual = read_lightManual();
+  if (lightManual == true) {
+    Serial.println("Avvio luci: manuale");
+  } else {
+    Serial.println("Avvio luci: automatico");
+  }
+
+  lightHStart = read_lightManualOnTimeHour();
+  lightMStart = read_lightManualOnTimeMinute();
+
+  lightHStop = read_lightManualOffTimeHour();
+  lightMStop = read_lightManualOffTimeMinute();
+
+  Serial.print("Ora accensione luci: ");
+  Serial.println(String(lightHStart) + ":" + String(lightMStart));
+
+
+  Serial.print("Ora spegnimento luci: ");
+  Serial.println(String(lightHStop) + ":" + String(lightMStop));
+}
+
+void handleSettingsPost(AsyncWebServerRequest *request) {
+  bool needCommit = false;
+  //lightManual
+  if (request->hasParam("lightManual", true)) {
+    String lightManualStr = request->getParam("lightManual", true)->value();
+    if (lightManualStr == "1") {
+      if (lightManual != true) {
+        lightManual = true;
+        write_lightManual(lightManual);
+        needCommit = true;
+      }
+    } else {
+      if (lightManual != false) {
+        lightManual = false;
+        write_lightManual(lightManual);
+        needCommit = true;
+      }
+    }
+  }
+
+  //lightManualOnTime
+  if (request->hasParam("lightManualOnTime", true)) {
+    String lightManualOnTimeStr = request->getParam("lightManualOnTime", true)->value();
+    int lightManualOnTimeHour = lightManualOnTimeStr.substring(0, 2).toInt();
+    int lightManualOnTimeMinute = lightManualOnTimeStr.substring(3, 5).toInt();
+    if (lightManualOnTimeHour != lightHStart || lightManualOnTimeMinute != lightMStart) {
+      lightHStart = lightManualOnTimeHour;
+      lightMStart = lightManualOnTimeMinute;
+      write_lightManualOnTime(lightHStart, lightMStart);
+      needCommit = true;
+    }
+  }
+
+  //lightManualOffTime
+  if (request->hasParam("lightManualOffTime", true)) {
+    String lightManualOffTimeStr = request->getParam("lightManualOffTime", true)->value();
+    Serial.println(lightManualOffTimeStr);
+
+    int lightManualOffTimeHour = lightManualOffTimeStr.substring(0, 2).toInt();
+    int lightManualOffTimeMinute = lightManualOffTimeStr.substring(3, 5).toInt();
+
+    if (lightManualOffTimeHour != lightHStop || lightManualOffTimeMinute != lightMStop) {
+      lightHStop = lightManualOffTimeHour;
+      lightMStop = lightManualOffTimeMinute;
+      write_lightManualOffTime(lightHStop, lightMStop);
+      needCommit = true;
+    }
+  }
+
+  if (needCommit) {
+    if (EEPROM.commit()) {
+      Serial.println("EEPROM successfully committed");
+    } else {
+      Serial.println("ERROR! EEPROM commit failed");
+    }
+  }
+
+  AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Ok");
+  response->addHeader("Location", "/");
+  request->send(response);
+}
+
 // The SETUP
 void setup() {
   // Serial port
   Serial.begin(115200);
+
+  // Initialize EEProm
+  EEPROM.begin(EEPROM_SIZE);
+
+  // Read data from EEPROM
+  loadPersistentData();
 
   // Init the DHT 22 sensor
   dht.begin();
@@ -388,7 +490,7 @@ void setup() {
   // Print ip address to LCD
   lcd.clear();
   String ip = "IP:" + WiFi.localIP().toString();
-  alignCenterLcd(0,ip);
+  alignCenterLcd(0, ip);
 
   // Start NTP client
   timeClient.begin();
@@ -408,37 +510,11 @@ void setup() {
   server.on("/rele1", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", getRele1StatusString().c_str());
   });
-    server.on("/rele2", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("/rele2", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", getRele2StatusString().c_str());
   });
 
-  server.on("/settings", HTTP_POST, [] (AsyncWebServerRequest *request) {
-    // String inputMessage;
-    // String inputParam;
-    // // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
-    // if (request->hasParam(PARAM_INPUT_1)) {
-    //   inputMessage = request->getParam(PARAM_INPUT_1)->value();
-    //   inputParam = PARAM_INPUT_1;
-    // }
-    // // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
-    // else if (request->hasParam(PARAM_INPUT_2)) {
-    //   inputMessage = request->getParam(PARAM_INPUT_2)->value();
-    //   inputParam = PARAM_INPUT_2;
-    // }
-    // // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
-    // else if (request->hasParam(PARAM_INPUT_3)) {
-    //   inputMessage = request->getParam(PARAM_INPUT_3)->value();
-    //   inputParam = PARAM_INPUT_3;
-    // }
-    // else {
-    //   inputMessage = "No message sent";
-    //   inputParam = "none";
-    // }
-    // Serial.println(inputMessage);
-    // request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
-    //                                  + inputParam + ") with value: " + inputMessage +
-    //                                  "<br><a href=\"/\">Return to Home Page</a>");
-  });
+  server.on("/settings", HTTP_POST, handleSettingsPost);
 
   // Start server
   server.begin();
@@ -451,7 +527,7 @@ void setup() {
   // Set the "Rele 1 inactive count down" (it will leave of Rele 1 at least for 'tot' seconds)
   rele1OffTimer.setCounter(0, 0, heatingIdleForSeconds, rele1OffTimer.COUNT_DOWN, onRele1OffComplete);
   // Set the callback function to call every second while "Rele 1 inactive count down" is active
-  rele1OffTimer.setInterval(refreshRele1OffClock, 1000);
+  // rele1OffTimer.setInterval(refreshRele1OffClock, 1000);
 
   // Execute the update of NTP client time every 1 second
   ntpClientUpdateTimer.setInterval(updateTime, 1000);
