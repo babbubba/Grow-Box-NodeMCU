@@ -135,6 +135,13 @@ String getRele1StatusString() {
   return "Spento";
 }
 
+String getRele2StatusString() {
+  if (rele2ActiveStatus == true) {
+    return "Acceso";
+  }
+  return "Spento";
+}
+
 void printRelaysStatusLcd() {
   lcd.setCursor(0, 2);
   lcd.print(" 1");
@@ -166,6 +173,8 @@ String processor(const String &var) {
   } else if (var == "HUMIDITY") {
     return String(readHumidity);
   } else if (var == "RELE1") {
+    return getRele1StatusString();
+  } else if (var == "RELE2") {
     return getRele1StatusString();
   } else if (var == "temperatureMin") {
     return String(temperatureMin);
@@ -398,6 +407,37 @@ void setup() {
   });
   server.on("/rele1", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", getRele1StatusString().c_str());
+  });
+    server.on("/rele2", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", getRele2StatusString().c_str());
+  });
+
+  server.on("/settings", HTTP_POST, [] (AsyncWebServerRequest *request) {
+    // String inputMessage;
+    // String inputParam;
+    // // GET input1 value on <ESP_IP>/get?input1=<inputMessage>
+    // if (request->hasParam(PARAM_INPUT_1)) {
+    //   inputMessage = request->getParam(PARAM_INPUT_1)->value();
+    //   inputParam = PARAM_INPUT_1;
+    // }
+    // // GET input2 value on <ESP_IP>/get?input2=<inputMessage>
+    // else if (request->hasParam(PARAM_INPUT_2)) {
+    //   inputMessage = request->getParam(PARAM_INPUT_2)->value();
+    //   inputParam = PARAM_INPUT_2;
+    // }
+    // // GET input3 value on <ESP_IP>/get?input3=<inputMessage>
+    // else if (request->hasParam(PARAM_INPUT_3)) {
+    //   inputMessage = request->getParam(PARAM_INPUT_3)->value();
+    //   inputParam = PARAM_INPUT_3;
+    // }
+    // else {
+    //   inputMessage = "No message sent";
+    //   inputParam = "none";
+    // }
+    // Serial.println(inputMessage);
+    // request->send(200, "text/html", "HTTP GET request sent to your ESP on input field (" 
+    //                                  + inputParam + ") with value: " + inputMessage +
+    //                                  "<br><a href=\"/\">Return to Home Page</a>");
   });
 
   // Start server

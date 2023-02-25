@@ -47,6 +47,11 @@ const char index_html[] PROGMEM = R"rawliteral(
     <span class="dht-labels">Riscaldamento</span>
     <span id="rele1">%RELE1%</span>
   </p>
+   <p class="measure">
+    <i class="fas fa-fire" style="color:#ff6600;"></i> 
+    <span class="dht-labels">Illuminazione</span>
+    <span id="rele2">%RELE2%</span>
+  </p>
   
 
 </body>
@@ -81,6 +86,17 @@ setInterval(function ( ) {
     }
   };
   xhttp.open("GET", "/rele1", true);
+  xhttp.send();
+}, 1000 ) ;
+
+setInterval(function ( ) {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      document.getElementById("rele2").innerHTML = this.responseText;
+    }
+  };
+  xhttp.open("GET", "/rele2", true);
   xhttp.send();
 }, 1000 ) ;
 </script>
