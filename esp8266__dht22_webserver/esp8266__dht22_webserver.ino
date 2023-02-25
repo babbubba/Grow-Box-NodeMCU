@@ -70,6 +70,18 @@ const float temperatureTol = 0.5;
 // Output value for Rele 1 (Heating)
 bool rele1ActiveStatus = false;
 
+// Output value for Rele 2 (Light)
+bool rele2ActiveStatus = false;
+
+// Lighting setting
+int lightHStart = 19;
+int lightMStart = 38;
+int lightHStop = 19;
+int lightMStop = 40;
+bool lightManual = false;
+
+Countimer scheduledLightTimer;
+
 // Temperature relay counter
 Countimer rele1OnTimer;
 Countimer rele1OffTimer;
@@ -172,7 +184,11 @@ void printRelaysStatusLcd() {
   }
   lcd.setCursor(4, 2);
   lcd.print("| 2");
-  lcd.write(0);
+  if (rele2ActiveStatus == true) {
+    lcd.write(1);
+  } else {
+    lcd.write(0);
+  }
   lcd.setCursor(9, 2);
   lcd.print("| 3");
   lcd.write(0);
@@ -214,6 +230,59 @@ void turnOffHeating() {
     Serial.println("Riscaldamento spento (o tempo accensione scaduto)");
     rele1CanTurnOn = false;
     rele1OffTimer.start();
+  }
+}
+
+void turnOnLight_auto() {
+  if (rele2ActiveStatus == false && lightManual == false) {
+    rele2ActiveStatus = true;
+    digitalWrite(RELE2, LOW);
+    Serial.println("Luce accesa (temporizzata)");
+  }
+}
+
+void turnOffLight_auto() {
+  if (rele2ActiveStatus == true && lightManual == false) {
+    rele2ActiveStatus = false;
+    digitalWrite(RELE2, HIGH);
+    Serial.println("Luce spenta (temporizzata)");
+  }
+}
+
+void turnOnLight_manual() {
+  if (rele2ActiveStatus == false) {
+    rele2ActiveStatus = true;
+    digitalWrite(RELE2, LOW);
+    Serial.println("Luce accesa");
+  }
+}
+
+void turnOffLight_manual() {
+  if (rele2ActiveStatus == true) {
+    rele2ActiveStatus = false;
+    digitalWrite(RELE2, HIGH);
+    Serial.println("Luce spenta");
+  }
+}
+
+int getMinutesFromMidNight(int hour, int minute) {
+  return  (hour * 60) + minute;
+}
+
+void checkLightTimer() {
+  timeClient.update();
+  int currentMinute = timeClient.getMinutes();
+  int currentHour = timeClient.getHours();
+
+  int currentMinutes = getMinutesFromMidNight(currentHour, currentMinute);
+  int lightStartMinutes = getMinutesFromMidNight(lightHStart, lightMStart);
+  int lightStopMinutes = getMinutesFromMidNight(lightHStop, lightMStop);
+
+  if (currentMinutes >= lightStartMinutes && currentMinutes < lightStopMinutes) {
+    turnOnLight_auto();
+  }
+  else {
+    turnOffLight_auto();
   }
 }
 
@@ -386,6 +455,9 @@ void setup() {
   // Execute the update of NTP client time every 1 second
   ntpClientUpdateTimer.setInterval(updateTime, 1000);
 
+  // Ecxecute the check for the light scheduled timer
+  scheduledLightTimer.setInterval(checkLightTimer, 1000);
+
   // Execute the read of dht 22 every 2 seconds
   dhtReadTimer.setInterval(readDHT22, 2000);
 }
@@ -401,6 +473,8 @@ void loop() {
   // Execute the none count (refreshing interval) counter for read dht22 every tot seconds
   dhtReadTimer.run();
 
+  scheduledLightTimer.run();
+
   // Only if it is the first loop after power on NodeMcu starts the "Rele 1 inactive count down" (so heating can start untill this periond when u just poer on this module)
   // and the read DHT22 interval
   if (firstLoop == true) {
@@ -408,6 +482,7 @@ void loop() {
     rele1OffTimer.start();
     dhtReadTimer.start();
     ntpClientUpdateTimer.start();
+    scheduledLightTimer.start();
     firstLoop == false;
   }
 }
