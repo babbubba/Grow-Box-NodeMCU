@@ -20,5 +20,12 @@ void write_lightManualOffTime(int hour, int minute);
 int read_lightManualOffTimeHour();
 int read_lightManualOffTimeMinute();
 
-#endif
+void write_temeperatureControlActive(bool temeperatureControlAvtive);
+void write_temperatureMin(int temperatureMin);
+void write_temperatureMax(int temperatureMax);
 
+bool read_temeperatureControlActive();
+int read_temperatureMin();
+int read_temperatureMax();
+
+#endif

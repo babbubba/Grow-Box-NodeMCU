@@ -33,12 +33,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="card-header bg-info text-white">Situazione in tempo reale</div>
           <div class="card-body">
             <p>
-              Il riscladamento rimane attivo per %heatingActiveForSeconds% secondi ed ha un periodo di inattivit&aacute;
-              minimo di %heatingIdleForSeconds% secondi (all'avvio sar&aacute; inattivo per %heatingIdleForSeconds%
-              secondi).
-            </p>
-            <p>
-              Range temperatura: %temperatureMin% &deg;C / %temperatureMax% &deg;C (&plusmn; %temperatureTol% &deg;C).
+              Riscladamento attivo per %heatingActiveForSeconds% secondi (inattivit&aacute; minima %heatingIdleForSeconds% secondi).
             </p>
             <p class="measure">
               <i class="fas fa-thermometer-half" style="color:#059e8a;"></i>
@@ -55,7 +50,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             <p class="measure">
               <i class="fas fa-fire" style="color:#ff1100;"></i>
               <span class="dht-labels">Riscaldamento</span>
-              <span id="rele1">%RELE1%</span>
+              <span id="rele1">%RELE1%</span><small id="rele1idle">%RELE1IDLE%</small>
             </p>
             <p class="measure">
               <i class="fas fa-lightbulb" style="color:#ffbb00;"></i>
@@ -234,6 +229,17 @@ const char index_html[] PROGMEM = R"rawliteral(
       var xhttp = new XMLHttpRequest();
       xhttp.onreadystatechange = function () {
         if (this.readyState == 4 && this.status == 200) {
+          document.getElementById("rele1idle").innerHTML = this.responseText;
+        }
+      };
+      xhttp.open("GET", "/rele1idle", true);
+      xhttp.send();
+    }, 1000);
+
+    setInterval(function () {
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function () {
+        if (this.readyState == 4 && this.status == 200) {
           document.getElementById("rele2").innerHTML = this.responseText;
         }
       };
@@ -248,6 +254,7 @@ const char index_html[] PROGMEM = R"rawliteral(
     selectElement('lightManual', '%lightManual%');
     selectElement('lightManualOnTime', '%lightManualOnTime%');
     selectElement('lightManualOffTime', '%lightManualOffTime%');
+    selectElement('tempActive', '%tempActive%');
   </script>
 
   <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"

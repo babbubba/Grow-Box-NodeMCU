@@ -120,6 +120,13 @@ String getRele1StatusString() {
   return "Spento";
 }
 
+String getRele1IdelString() {
+  if (rele1CanTurnOn == true) {
+    return "Attivabile";
+  }
+  return "Sospeso";
+}
+
 String getRele2StatusString() {
   if (rele2ActiveStatus == true) {
     return "Acceso";
@@ -129,6 +136,13 @@ String getRele2StatusString() {
 
 String getLightManualString() {
   if (lightManual == true) {
+    return "1";
+  } else {
+    return "0";
+  }
+}
+String getTemeperatureControlActiveString() {
+  if (temeperatureControlActive == true) {
     return "1";
   } else {
     return "0";
@@ -180,6 +194,8 @@ String processor(const String &var) {
     return String(readHumidity);
   } else if (var == "RELE1") {
     return getRele1StatusString();
+  } else if (var == "RELE1IDLE") {
+    return getRele1IdelString();
   } else if (var == "RELE2") {
     return getRele2StatusString();
   } else if (var == "temperatureMin") {
@@ -188,6 +204,8 @@ String processor(const String &var) {
     return String(temperatureMax);
   } else if (var == "temperatureTol") {
     return String(temperatureTol);
+  } else if (var == "tempActive") {
+    return getTemeperatureControlActiveString();
   } else if (var == "heatingActiveForSeconds") {
     return String(heatingActiveForSeconds);
   } else if (var == "heatingIdleForSeconds") {
@@ -291,6 +309,11 @@ void updateTime() {
 }
 // Handle Rele 1 activation by temerature status (on if under the rage otherwise off)
 void checkTemperature() {
+  if (temeperatureControlActive == false) {
+    turnOffHeating();
+    return;
+  }
+
   if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
     // Temperature is in the range turn of the rele 1
     turnOffHeating();
@@ -319,19 +342,13 @@ void refreshRele1OnClock() {
   Serial.println(rele1OnTimer.getCurrentTime());
 }
 
-// Called every second to show Rele1 in unactive status on serial monitor (only first time)
-// void refreshRele1OffClock() {
-//   if (firstTimeRele1OffExecuted == false) return;
-//   Serial.print("Tempo di attesa del riscaldamento rimasto: ");
-//   Serial.println(rele1OffTimer.getCurrentTime());
-// }
-
 // Read the sensor temperature and humidity
 void readDHT22() {
   // Read temperature
   float justReadTemperature = dht.readTemperature();
   if (isnan(justReadTemperature)) {
     // if temperature read failed, don't change the value
+    Serial.println("Errore rilevando la temperatura");
     readTemperatureNotValid = true;
   } else {
     readTemperature = justReadTemperature;
@@ -341,6 +358,7 @@ void readDHT22() {
   float justReadHumidity = dht.readHumidity();
   // if humidity read failed, don't change the value
   if (isnan(justReadHumidity)) {
+    Serial.println("Errore rilevando l'umidità");
     readHumidityNotValid = true;
   } else {
     readHumidity = justReadHumidity;
@@ -366,12 +384,9 @@ void loadPersistentData() {
   lightHStop = read_lightManualOffTimeHour();
   lightMStop = read_lightManualOffTimeMinute();
 
-  Serial.print("Ora accensione luci: ");
-  Serial.println(String(lightHStart) + ":" + String(lightMStart));
-
-
-  Serial.print("Ora spegnimento luci: ");
-  Serial.println(String(lightHStop) + ":" + String(lightMStop));
+  temeperatureControlActive = read_temeperatureControlActive();
+  temperatureMin = read_temperatureMin();
+  temperatureMax = read_temperatureMax();
 }
 
 void handleSettingsPost(AsyncWebServerRequest *request) {
@@ -410,15 +425,52 @@ void handleSettingsPost(AsyncWebServerRequest *request) {
   //lightManualOffTime
   if (request->hasParam("lightManualOffTime", true)) {
     String lightManualOffTimeStr = request->getParam("lightManualOffTime", true)->value();
-    Serial.println(lightManualOffTimeStr);
-
     int lightManualOffTimeHour = lightManualOffTimeStr.substring(0, 2).toInt();
     int lightManualOffTimeMinute = lightManualOffTimeStr.substring(3, 5).toInt();
-
     if (lightManualOffTimeHour != lightHStop || lightManualOffTimeMinute != lightMStop) {
       lightHStop = lightManualOffTimeHour;
       lightMStop = lightManualOffTimeMinute;
       write_lightManualOffTime(lightHStop, lightMStop);
+      needCommit = true;
+    }
+  }
+
+  //temeperatureControlActive (tempActive)
+  if (request->hasParam("tempActive", true)) {
+    String value = request->getParam("tempActive", true)->value();
+    if (value == "1") {
+      if (temeperatureControlActive != true) {
+        temeperatureControlActive = true;
+        write_temeperatureControlActive(temeperatureControlActive);
+        needCommit = true;
+      }
+    } else {
+      if (temeperatureControlActive != false) {
+        temeperatureControlActive = false;
+        write_temeperatureControlActive(temeperatureControlActive);
+        needCommit = true;
+      }
+    }
+  }
+
+  //temperatureMin (tempMin)
+  if (request->hasParam("tempMin", true)) {
+    String value = request->getParam("tempMin", true)->value();
+    int newTemperatureMin = value.toInt();
+    if (newTemperatureMin != temperatureMin) {
+      temperatureMin = newTemperatureMin;
+      write_temperatureMin(temperatureMin);
+      needCommit = true;
+    }
+  }
+
+  //temperatureMax (tempMax)
+  if (request->hasParam("tempMax", true)) {
+    String value = request->getParam("tempMax", true)->value();
+    int newTemperatureMax = value.toInt();
+    if (newTemperatureMax != temperatureMax) {
+      temperatureMax = newTemperatureMax;
+      write_temperatureMax(temperatureMax);
       needCommit = true;
     }
   }
@@ -510,6 +562,11 @@ void setup() {
   server.on("/rele1", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", getRele1StatusString().c_str());
   });
+  server.on("/rele1idle", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send_P(200, "text/plain", getRele1IdelString().c_str());
+  });
+
+  //rele1CanTurnOn
   server.on("/rele2", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send_P(200, "text/plain", getRele2StatusString().c_str());
   });

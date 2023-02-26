@@ -33,15 +33,17 @@ const long utcOffsetInSeconds = 3600;  //UTC +1 - Rome
 
 // RELAYS PINS
 #define RELE1 D0  // Riscaldamento
-#define RELE2 D5  // Luce
-#define RELE3 D6  // D6
+//inverto temporaneamente il rele 2 con il 3 per capire se ho un problema sul modulo relè ed il secondo si è bruciato
+#define RELE2 D6  // Luce
+#define RELE3 D5  // D6
 #define RELE4 D7  // D7
 
 // Temperature
 // Temerature Range
-const float temperatureMin = 21;
-const float temperatureMax = 24;
-const float temperatureTol = 0.5;
+float temperatureMin = 21;
+float temperatureMax = 24;
+float temperatureTol = 0.5;
+bool temeperatureControlActive = false;
 
 // Temperature timing
 const int heatingActiveForSeconds = 20;

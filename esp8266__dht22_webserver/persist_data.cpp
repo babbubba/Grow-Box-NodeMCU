@@ -65,4 +65,26 @@ int read_lightManualOffTimeMinute() {
   return readIntFromEEPROM(8);
 }
 
+void write_temeperatureControlActive(bool temeperatureControlAvtive) {
+   writeBoolToEEPROM(10, temeperatureControlAvtive);
+}
 
+void write_temperatureMin(int temperatureMin) {
+  writeIntToEEPROM(11, temperatureMin);
+}
+
+void write_temperatureMax(int temperatureMax) {
+  writeIntToEEPROM(13, temperatureMax);
+}
+
+bool read_temeperatureControlActive() {
+    return readBoolFromEEPROM(10);
+}
+
+int read_temperatureMin() {
+    return readIntFromEEPROM(11);
+}
+
+int read_temperatureMax() {
+      return readIntFromEEPROM(13);
+}
