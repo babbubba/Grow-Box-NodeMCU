@@ -206,7 +206,11 @@ String processor(const String &var) {
     return String(temperatureTol);
   } else if (var == "tempActive") {
     return getTemeperatureControlActiveString();
-  } else if (var == "heatingActiveForSeconds") {
+  } else if (var == "temperatureMinNight") {
+    return String(temperatureMinNight);
+  } else if (var == "temperatureMaxNight") {
+    return String(temperatureMaxNight);
+  }  else if (var == "heatingActiveForSeconds") {
     return String(heatingActiveForSeconds);
   } else if (var == "heatingIdleForSeconds") {
     return String(heatingIdleForSeconds);
@@ -314,6 +318,38 @@ void checkTemperature() {
     return;
   }
 
+  // If is day
+  if (rele2ActiveStatus == true) {
+    if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
+      // Temperature is in the range turn of the rele 1
+      turnOffHeating();
+    } else if ((readTemperature - temperatureTol) < temperatureMin) {
+      //temeperature too low... turn on rele 1 if possible and if is not already active
+      if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
+        turnOnHeating();
+      }
+    } else {
+      // Temperature is too high... turn off rele 1
+      turnOffHeating();
+    }
+
+  } else {
+    //is night
+     if ((readTemperature - temperatureTol) >= temperatureMinNight && (readTemperature + temperatureTol) <= temperatureMaxNight) {
+      // Temperature is in the range turn of the rele 1
+      turnOffHeating();
+    } else if ((readTemperature - temperatureTol) < temperatureMinNight) {
+      //temeperature too low... turn on rele 1 if possible and if is not already active
+      if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
+        turnOnHeating();
+      }
+    } else {
+      // Temperature is too high... turn off rele 1
+      turnOffHeating();
+    }
+  }
+
+
   if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
     // Temperature is in the range turn of the rele 1
     turnOffHeating();
@@ -387,6 +423,8 @@ void loadPersistentData() {
   temeperatureControlActive = read_temeperatureControlActive();
   temperatureMin = read_temperatureMin();
   temperatureMax = read_temperatureMax();
+  temperatureMinNight = read_temperatureMinNight();
+  temperatureMaxNight = read_temperatureMaxNight();
 }
 
 void handleSettingsPost(AsyncWebServerRequest *request) {
@@ -471,6 +509,30 @@ void handleSettingsPost(AsyncWebServerRequest *request) {
     if (newTemperatureMax != temperatureMax) {
       temperatureMax = newTemperatureMax;
       write_temperatureMax(temperatureMax);
+      needCommit = true;
+    }
+  }
+
+
+
+//temperatureMinNight (tempMinNight)
+  if (request->hasParam("tempMinNight", true)) {
+    String value = request->getParam("tempMinNight", true)->value();
+    int newTemperatureMinNight = value.toInt();
+    if (newTemperatureMinNight != temperatureMinNight) {
+      temperatureMinNight = newTemperatureMinNight;
+      write_temperatureMinNight(temperatureMinNight);
+      needCommit = true;
+    }
+  }
+
+  //temperatureMaxNight (tempMaxNight)
+  if (request->hasParam("tempMaxNight", true)) {
+    String value = request->getParam("tempMaxNight", true)->value();
+    int newTemperatureMaxNight = value.toInt();
+    if (newTemperatureMaxNight != temperatureMaxNight) {
+      temperatureMaxNight = newTemperatureMaxNight;
+      write_temperatureMaxNight(temperatureMaxNight);
       needCommit = true;
     }
   }

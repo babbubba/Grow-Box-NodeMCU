@@ -88,3 +88,19 @@ int read_temperatureMin() {
 int read_temperatureMax() {
       return readIntFromEEPROM(13);
 }
+
+void write_temperatureMinNight(int temperatureMinNight) {
+  writeIntToEEPROM(15, temperatureMinNight);
+}
+
+void write_temperatureMaxNight(int temperatureMaxNight) {
+  writeIntToEEPROM(17, temperatureMaxNight);
+}
+
+int read_temperatureMinNight() {
+    return readIntFromEEPROM(15);
+}
+
+int read_temperatureMaxNight() {
+      return readIntFromEEPROM(17);
+}

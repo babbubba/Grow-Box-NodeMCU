@@ -1,7 +1,7 @@
 #ifndef PERSIST_DATA_H
 #define PERSIST_DATA_H
 
-#define EEPROM_SIZE 16
+#define EEPROM_SIZE 24
 
 int readIntFromEEPROM(int address);
 void writeIntToEEPROM(int address, int number);
@@ -23,9 +23,13 @@ int read_lightManualOffTimeMinute();
 void write_temeperatureControlActive(bool temeperatureControlAvtive);
 void write_temperatureMin(int temperatureMin);
 void write_temperatureMax(int temperatureMax);
+void write_temperatureMinNight(int temperatureMinNight);
+void write_temperatureMaxNight(int temperatureMaxNight);
 
 bool read_temeperatureControlActive();
 int read_temperatureMin();
 int read_temperatureMax();
+int read_temperatureMinNight();
+int read_temperatureMaxNight();
 
 #endif

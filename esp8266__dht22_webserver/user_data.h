@@ -39,10 +39,14 @@ const long utcOffsetInSeconds = 3600;  //UTC +1 - Rome
 #define RELE4 D7  // D7
 
 // Temperature
-// Temerature Range
-float temperatureMin = 21;
-float temperatureMax = 24;
-float temperatureTol = 0.5;
+// Temerature Range (Day)
+float temperatureMin = 23;
+float temperatureMax = 28;
+float temperatureTol = 0.3;
+// Temerature Range (Night)
+float temperatureMinNight = 19;
+float temperatureMaxNight = 23;
+float temperatureTolNight = 0.2;
 bool temeperatureControlActive = false;
 
 // Temperature timing

@@ -143,6 +143,26 @@ const char index_html[] PROGMEM = R"rawliteral(
                             raffreddamento.</small>
                         </div>
                       </div>
+                      <div class="form-row">
+                        <div class="form-group col-md-6">
+                          <label for="tempMinNight">Temp. minima (notte)</label>
+                          <input type="number" class="form-control" id="tempMinNight" name="tempMinNight" value="%temperatureMinNight%"
+                            aria-describedby="tempMinHelp">
+                          <small id="tempMinHelp" class="form-text text-muted">Al di sotto di questa temperatura si
+                            attiva
+                            il
+                            riscaldamento.</small>
+                        </div>
+                        <div class="form-group col-md-6">
+                          <label for="tempMaxNight">Temp. massima (notte)</label>
+                          <input type="number" class="form-control" id="tempMaxNight" name="tempMaxNight" value="%temperatureMaxNight%"
+                            aria-describedby="tempMaxHelp">
+                          <small id="tempMaxHelp" class="form-text text-muted">Al di sopra di questa temperatura si
+                            attiva
+                            il
+                            raffreddamento.</small>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
