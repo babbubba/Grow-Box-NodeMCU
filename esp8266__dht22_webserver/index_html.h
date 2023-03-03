@@ -1,6 +1,6 @@
 
 const char index_html[] PROGMEM = R"rawliteral(
-<!doctype html>
+  <!doctype html>
 <html lang="it">
 
 <head>
@@ -22,6 +22,10 @@ const char index_html[] PROGMEM = R"rawliteral(
       padding-bottom: 4px;
       ;
     }
+
+    .sup {
+        font-size: 50%;
+    }
   </style>
 </head>
 
@@ -33,7 +37,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="card-header bg-info text-white">Situazione in tempo reale</div>
           <div class="card-body">
             <p>
-              Riscladamento attivo per %heatingActiveForSeconds% secondi (inattivit&aacute; minima %heatingIdleForSeconds% secondi).
+              Riscladamento attivo per %heatingActiveForMinutes% minuti e %heatingActiveForSeconds% secondi (inattivit&aacute; minima %heatingIdleForMinutes% minuti e %heatingIdleForSeconds% secondi).
             </p>
             <p class="measure">
               <i class="fas fa-thermometer-half" style="color:#059e8a;"></i>
@@ -50,7 +54,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             <p class="measure">
               <i class="fas fa-fire" style="color:#ff1100;"></i>
               <span class="dht-labels">Riscaldamento</span>
-              <span id="rele1">%RELE1%</span><small id="rele1idle">%RELE1IDLE%</small>
+              <span id="rele1">%RELE1%</span> <sup id="rele1idle">%RELE1IDLE%</sup>
             </p>
             <p class="measure">
               <i class="fas fa-lightbulb" style="color:#ffbb00;"></i>
@@ -97,7 +101,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <div class="form-group col-md-6">
                           <label for="lightManualOffTime">Spegnimento</label>
                           <input type="time" class="form-control" id="lightManualOffTime" name="lightManualOffTime"
-                            aria-describedby="lightManualOffTimeHelp">
+                            aria-describedby="lightManualOffTimeHelp" value="%lightManualOffTime%">
                           <small id="lightManualOffTimeHelp" class="form-text text-muted">L'orario di spegnimento delle
                             luci.</small>
                         </div>
@@ -125,22 +129,14 @@ const char index_html[] PROGMEM = R"rawliteral(
                       </div>
                       <div class="form-row">
                         <div class="form-group col-md-6">
-                          <label for="tempMin">Temp. minima</label>
+                          <label for="tempMin">Temp. minima (giorno)</label>
                           <input type="number" class="form-control" id="tempMin" name="tempMin" value="%temperatureMin%"
                             aria-describedby="tempMinHelp">
-                          <small id="tempMinHelp" class="form-text text-muted">Al di sotto di questa temperatura si
-                            attiva
-                            il
-                            riscaldamento.</small>
                         </div>
                         <div class="form-group col-md-6">
-                          <label for="tempMax">Temp. massima</label>
+                          <label for="tempMax">Temp. massima (giorno)</label>
                           <input type="number" class="form-control" id="tempMax" name="tempMax" value="%temperatureMax%"
                             aria-describedby="tempMaxHelp">
-                          <small id="tempMaxHelp" class="form-text text-muted">Al di sopra di questa temperatura si
-                            attiva
-                            il
-                            raffreddamento.</small>
                         </div>
                       </div>
                       <div class="form-row">
@@ -148,19 +144,25 @@ const char index_html[] PROGMEM = R"rawliteral(
                           <label for="tempMinNight">Temp. minima (notte)</label>
                           <input type="number" class="form-control" id="tempMinNight" name="tempMinNight" value="%temperatureMinNight%"
                             aria-describedby="tempMinHelp">
-                          <small id="tempMinHelp" class="form-text text-muted">Al di sotto di questa temperatura si
-                            attiva
-                            il
-                            riscaldamento.</small>
                         </div>
                         <div class="form-group col-md-6">
                           <label for="tempMaxNight">Temp. massima (notte)</label>
                           <input type="number" class="form-control" id="tempMaxNight" name="tempMaxNight" value="%temperatureMaxNight%"
                             aria-describedby="tempMaxHelp">
-                          <small id="tempMaxHelp" class="form-text text-muted">Al di sopra di questa temperatura si
-                            attiva
-                            il
-                            raffreddamento.</small>
+                        </div>
+                      </div>
+                      <div class="form-row">
+                        <div class="form-group col-md-6">
+                          <label for="heatingActiveTime">Limite riscaldamento attivo</label>
+                          <input type="time" class="form-control" id="heatingActiveTime" name="heatingActiveTime"
+                            aria-describedby="heatingActiveTimeHelp" value="%heatingActiveTime%" step="5" min="00:00" max="00:02">
+                          <small id="heatingActiveTimeHelp" class="form-text text-muted">Tempo limite di accensione del riscaldamento (limite due minuti!).</small>
+                        </div>
+                        <div class="form-group col-md-6">
+                          <label for="heatingInactiveTime">Riscaldamento a riposo</label>
+                          <input type="time" class="form-control" id="heatingInactiveTime" name="heatingInactiveTime"
+                            aria-describedby="heatingInactiveTimeHelp" value="%heatingInactiveTime%" step="5" min="00:00"  max="00:30">
+                          <small id="heatingInactiveTimeHelp" class="form-text text-muted">Il tempo d'attesa prima di poter riaccendere il riscaldamento.</small>
                         </div>
                       </div>
                     </div>
@@ -275,6 +277,9 @@ const char index_html[] PROGMEM = R"rawliteral(
     selectElement('lightManualOnTime', '%lightManualOnTime%');
     selectElement('lightManualOffTime', '%lightManualOffTime%');
     selectElement('tempActive', '%tempActive%');
+    selectElement('heatingActiveTime', '%heatingActiveTime%');
+    selectElement('heatingInactiveTime', '%heatingInactiveTime%');
+
   </script>
 
   <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
@@ -286,4 +291,5 @@ const char index_html[] PROGMEM = R"rawliteral(
     crossorigin="anonymous"></script>
 </body>
 
-</html>)rawliteral";
+</html>
+)rawliteral";

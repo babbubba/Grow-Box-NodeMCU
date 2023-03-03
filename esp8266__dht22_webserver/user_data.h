@@ -42,16 +42,18 @@ const long utcOffsetInSeconds = 3600;  //UTC +1 - Rome
 // Temerature Range (Day)
 float temperatureMin = 23;
 float temperatureMax = 28;
-float temperatureTol = 0.3;
+float temperatureTol = 0.5;
 // Temerature Range (Night)
 float temperatureMinNight = 19;
 float temperatureMaxNight = 23;
-float temperatureTolNight = 0.2;
+float temperatureTolNight = 0.4;
 bool temeperatureControlActive = false;
 
 // Temperature timing
-const int heatingActiveForSeconds = 20;
-const int heatingIdleForSeconds = 100;
+int heatingActiveForMinutes = 1;
+int heatingActiveForSeconds = 15;
+int heatingIdleForMinutes = 2;
+int heatingIdleForSeconds = 00;
 
 // define variable to handle temperature & humidity
 float readTemperature = 0.0;

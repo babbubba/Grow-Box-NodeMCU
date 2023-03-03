@@ -104,3 +104,30 @@ int read_temperatureMinNight() {
 int read_temperatureMaxNight() {
       return readIntFromEEPROM(17);
 }
+
+
+// Timeout heating
+void write_heatingActiveForMinutes(int heatingActiveForMinutes) {
+  writeIntToEEPROM(19, heatingActiveForMinutes);
+}
+int read_heatingActiveForMinutes() {
+      return readIntFromEEPROM(19);
+}
+void write_heatingActiveForSeconds(int heatingActiveForSeconds) {
+  writeIntToEEPROM(21, heatingActiveForSeconds);
+}
+int read_heatingActiveForSeconds() {
+      return readIntFromEEPROM(21);
+}
+void write_heatingIdleForMinutes(int heatingIdleForMinutes) {
+  writeIntToEEPROM(23, heatingIdleForMinutes);
+}
+int read_heatingIdleForMinutes() {
+      return readIntFromEEPROM(23);
+}
+void write_heatingIdleForSeconds(int heatingIdleForSeconds) {
+  writeIntToEEPROM(25, heatingIdleForSeconds);
+}
+int read_heatingIdleForSeconds() {
+      return readIntFromEEPROM(25);
+}

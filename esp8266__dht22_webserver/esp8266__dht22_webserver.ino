@@ -107,7 +107,6 @@ void alignCenterLcd(int row, String message) {
   lcd.print(message);
 }
 
-
 void writeTempNHumiLcd() {
   String text = "t:" + String(readTemperature) + "C - h:" + String(readHumidity) + "%";
   alignCenterLcd(1, text);
@@ -141,6 +140,7 @@ String getLightManualString() {
     return "0";
   }
 }
+
 String getTemeperatureControlActiveString() {
   if (temeperatureControlActive == true) {
     return "1";
@@ -185,6 +185,23 @@ String getTimeFormatedFromIntegers(int hour, int minute) {
   return hourStr + ":" + minuteStr;
 }
 
+String getTimeFormatedFromIntegers(int hour, int minute, int second) {
+  String hourStr = String(hour);
+  if (hourStr.length() == 1) {
+    hourStr = "0" + hourStr;
+  }
+  String minuteStr = String(minute);
+  if (minuteStr.length() == 1) {
+    minuteStr = "0" + minuteStr;
+  }
+    String secondStr = String(second);
+  if (secondStr.length() == 1) {
+    secondStr = "0" + secondStr;
+  }
+
+  return hourStr + ":" + minuteStr + ":" + secondStr;
+}
+
 // Replaces placeholder in HTML with values (is called only first time in the setup method)
 String processor(const String &var) {
   //Serial.println(var);
@@ -210,16 +227,24 @@ String processor(const String &var) {
     return String(temperatureMinNight);
   } else if (var == "temperatureMaxNight") {
     return String(temperatureMaxNight);
-  }  else if (var == "heatingActiveForSeconds") {
+  } else if (var == "heatingActiveForSeconds") {
     return String(heatingActiveForSeconds);
+  } else if (var == "heatingActiveForMinutes") {
+    return String(heatingActiveForMinutes);
   } else if (var == "heatingIdleForSeconds") {
     return String(heatingIdleForSeconds);
+  } else if (var == "heatingIdleForMinutes") {
+    return String(heatingIdleForMinutes);
   } else if (var == "lightManual") {
     return getLightManualString();
   } else if (var == "lightManualOnTime") {
     return getTimeFormatedFromIntegers(lightHStart, lightMStart);
   } else if (var == "lightManualOffTime") {
     return getTimeFormatedFromIntegers(lightHStop, lightMStop);
+  } else if (var == "heatingActiveTime") {
+    return getTimeFormatedFromIntegers(0,heatingActiveForMinutes, heatingActiveForSeconds);
+  } else if (var == "heatingInactiveTime") {
+    return getTimeFormatedFromIntegers(0,heatingIdleForMinutes, heatingIdleForSeconds);
   }
 
   return String();
@@ -233,7 +258,7 @@ void turnOffHeating() {
     digitalWrite(RELE1, HIGH);
     Serial.println("Riscaldamento spento (o tempo accensione scaduto)");
     rele1CanTurnOn = false;
-    rele1OffTimer.start();
+    rele1OffTimer.restart();
   }
 }
 
@@ -292,7 +317,7 @@ void checkLightTimer() {
 // Called when need to turn on heating
 void turnOnHeating() {
   if (rele1ActiveStatus == false) {
-    rele1OnTimer.start();
+    rele1OnTimer.restart();
     Serial.println("Riscaldamento attivato");
     rele1ActiveStatus = true;
     digitalWrite(RELE1, LOW);
@@ -311,6 +336,7 @@ void updateTime() {
   // Serial.println(timeClient.getFormattedTime());
   alignRightLcd(3, timeClient.getFormattedTime());
 }
+
 // Handle Rele 1 activation by temerature status (on if under the rage otherwise off)
 void checkTemperature() {
   if (temeperatureControlActive == false) {
@@ -318,50 +344,51 @@ void checkTemperature() {
     return;
   }
 
-  // If is day
   if (rele2ActiveStatus == true) {
-    if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
+    // Is DAY
+    if (readTemperature >= (temperatureMin + temperatureTol) && readTemperature <= (temperatureMax - temperatureTol)) {
       // Temperature is in the range turn of the rele 1
+      Serial.println("Temperatura nel range....spegni");
+
       turnOffHeating();
-    } else if ((readTemperature - temperatureTol) < temperatureMin) {
+      //turn off cooling
+    } else if (readTemperature < (temperatureMin - temperatureTol)) {
       //temeperature too low... turn on rele 1 if possible and if is not already active
+      Serial.println("Temperatura troppo bassa... accendi");
       if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
         turnOnHeating();
       }
-    } else {
+    } else if (readTemperature > (temperatureMax + temperatureTol)) {
       // Temperature is too high... turn off rele 1
       turnOffHeating();
+      Serial.println("Temperatura troppo alta...spegni");
+      // turn on cooling
     }
 
   } else {
     //is night
-     if ((readTemperature - temperatureTol) >= temperatureMinNight && (readTemperature + temperatureTol) <= temperatureMaxNight) {
+    if (readTemperature >= (temperatureMinNight + temperatureTol) && readTemperature <= (temperatureMaxNight - temperatureTol)) {
       // Temperature is in the range turn of the rele 1
+      Serial.println("Temperatura nel range....spegni");
+
       turnOffHeating();
-    } else if ((readTemperature - temperatureTol) < temperatureMinNight) {
+      //turn off cooling
+    } else if (readTemperature < (temperatureMinNight - temperatureTol)) {
       //temeperature too low... turn on rele 1 if possible and if is not already active
+      Serial.println("Temperatura troppo bassa... accendi");
       if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
         turnOnHeating();
       }
-    } else {
+    } else if (readTemperature > (temperatureMaxNight + temperatureTol)) {
       // Temperature is too high... turn off rele 1
       turnOffHeating();
+      Serial.println("Temperatura troppo alta...spegni");
+      // turn on cooling
     }
   }
 
 
-  if ((readTemperature - temperatureTol) >= temperatureMin && (readTemperature + temperatureTol) <= temperatureMax) {
-    // Temperature is in the range turn of the rele 1
-    turnOffHeating();
-  } else if ((readTemperature - temperatureTol) < temperatureMin) {
-    //temeperature too low... turn on rele 1 if possible and if is not already active
-    if (rele1OnTimer.isStopped() && rele1CanTurnOn == true && readTemperatureNotValid == false) {
-      turnOnHeating();
-    }
-  } else {
-    // Temperature is too high... turn off rele 1
-    turnOffHeating();
-  }
+
   // Print relays statuses on LCD
   printRelaysStatusLcd();
 }
@@ -425,6 +452,12 @@ void loadPersistentData() {
   temperatureMax = read_temperatureMax();
   temperatureMinNight = read_temperatureMinNight();
   temperatureMaxNight = read_temperatureMaxNight();
+
+
+  heatingActiveForMinutes = read_heatingActiveForMinutes();
+  heatingActiveForSeconds = read_heatingActiveForSeconds();
+  heatingIdleForMinutes = read_heatingIdleForMinutes();
+  heatingIdleForSeconds = read_heatingIdleForSeconds();
 }
 
 void handleSettingsPost(AsyncWebServerRequest *request) {
@@ -515,7 +548,7 @@ void handleSettingsPost(AsyncWebServerRequest *request) {
 
 
 
-//temperatureMinNight (tempMinNight)
+  //temperatureMinNight (tempMinNight)
   if (request->hasParam("tempMinNight", true)) {
     String value = request->getParam("tempMinNight", true)->value();
     int newTemperatureMinNight = value.toInt();
@@ -533,6 +566,38 @@ void handleSettingsPost(AsyncWebServerRequest *request) {
     if (newTemperatureMaxNight != temperatureMaxNight) {
       temperatureMaxNight = newTemperatureMaxNight;
       write_temperatureMaxNight(temperatureMaxNight);
+      needCommit = true;
+    }
+  }
+
+
+
+    //heatingActiveTime
+  if (request->hasParam("heatingActiveTime", true)) {
+    String heatingActiveTimeStr = request->getParam("heatingActiveTime", true)->value();
+    //int currentHeatingActiveTimeHour = heatingActiveTimeStr.substring(0, 2).toInt();
+    int currentHeatingActiveTimeMinute = heatingActiveTimeStr.substring(3, 5).toInt();
+    int currentHeatingActiveTimeSeconds = heatingActiveTimeStr.substring(6, 8).toInt();
+    if (currentHeatingActiveTimeMinute != heatingActiveForMinutes || currentHeatingActiveTimeSeconds != heatingActiveForSeconds) {
+      heatingActiveForMinutes = currentHeatingActiveTimeMinute;
+      heatingActiveForSeconds = currentHeatingActiveTimeSeconds;
+      write_heatingActiveForMinutes(heatingActiveForMinutes);
+      write_heatingActiveForSeconds(heatingActiveForSeconds);
+      needCommit = true;
+    }
+  }
+
+    //heatingInactiveTime
+  if (request->hasParam("heatingInactiveTime", true)) {
+    String heatingInactiveTimeStr = request->getParam("heatingInactiveTime", true)->value();
+    //int currentHeatingInactiveTimeHour = heatingActiveTimeStr.substring(0, 2).toInt();
+    int currentHeatingInactiveTimeMinute = heatingInactiveTimeStr.substring(3, 5).toInt();
+    int currentHeatingInactiveTimeSeconds = heatingInactiveTimeStr.substring(6, 8).toInt();
+    if (currentHeatingInactiveTimeMinute != heatingIdleForMinutes || currentHeatingInactiveTimeSeconds != heatingIdleForSeconds) {
+      heatingIdleForMinutes = currentHeatingInactiveTimeMinute;
+      heatingIdleForSeconds = currentHeatingInactiveTimeSeconds;
+      write_heatingIdleForMinutes(heatingIdleForMinutes);
+      write_heatingIdleForSeconds(heatingIdleForSeconds);
       needCommit = true;
     }
   }
@@ -639,12 +704,12 @@ void setup() {
   server.begin();
 
   // Set the "Rele 1 active count down" (it will leave on Rele 1 for 'tot' seconds)
-  rele1OnTimer.setCounter(0, 0, heatingActiveForSeconds, rele1OnTimer.COUNT_DOWN, turnOffHeating);
+  rele1OnTimer.setCounter(0, heatingActiveForMinutes, heatingActiveForSeconds, rele1OnTimer.COUNT_DOWN, turnOffHeating);
   // Set the callback function to call every second while "Rele 1 active count down" is active
   rele1OnTimer.setInterval(refreshRele1OnClock, 1000);
 
   // Set the "Rele 1 inactive count down" (it will leave of Rele 1 at least for 'tot' seconds)
-  rele1OffTimer.setCounter(0, 0, heatingIdleForSeconds, rele1OffTimer.COUNT_DOWN, onRele1OffComplete);
+  rele1OffTimer.setCounter(0, heatingIdleForMinutes, heatingIdleForSeconds, rele1OffTimer.COUNT_DOWN, onRele1OffComplete);
   // Set the callback function to call every second while "Rele 1 inactive count down" is active
   // rele1OffTimer.setInterval(refreshRele1OffClock, 1000);
 
